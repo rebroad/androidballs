@@ -1,12 +1,5 @@
-#ifdef SDL2
-#define SDL_MAIN_HANDLED
-#include "SDL_main.h"
-#include "SDL.h"
-#else
-#include "SDL3/SDL.h"
-#endif
-
-#include <stdio.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <android/log.h>
 
 #define LOG_TAG "SDLHelloWorld"

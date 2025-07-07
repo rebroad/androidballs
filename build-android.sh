@@ -47,7 +47,7 @@ find_ndk() {
         # Find the latest NDK version
         NDK_VERSION=$(ls "$ANDROID_NDK_PATH" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -n1)
         if [ -n "$NDK_VERSION" ]; then
-            echo "$ANDROID_NDK_PATH/$NDK_VERSION"
+            echo "$(cd "$ANDROID_NDK_PATH/$NDK_VERSION" && pwd)"
             return 0
         fi
     fi
@@ -127,25 +127,33 @@ check_sdl_android_project() {
 # Function to prepare Android project
 prepare_android_project() {
     print_status "Preparing Android project..."
-    
-    # Create a copy of the SDL Android project
     ANDROID_BUILD_DIR="build-android"
-    if [ -d "$ANDROID_BUILD_DIR" ]; then
-        print_status "Removing existing Android build directory..."
-        rm -rf "$ANDROID_BUILD_DIR"
+    if [ "$CLEAN_BUILD" = true ]; then
+        if [ -d "$ANDROID_BUILD_DIR" ]; then
+            print_status "Removing existing Android build directory (--clean)..."
+            rm -rf "$ANDROID_BUILD_DIR"
+        fi
     fi
-    
-    print_status "Copying SDL Android project template..."
-    cp -r "$SDL_ANDROID_PROJECT" "$ANDROID_BUILD_DIR"
-    
-    # Replace the placeholder source with our main.c
-    print_status "Replacing placeholder source with main.c..."
-    cp main.c "$ANDROID_BUILD_DIR/app/jni/src/"
-    
+    if [ ! -d "$ANDROID_BUILD_DIR" ]; then
+        print_status "Copying SDL Android project template..."
+        cp -r "$SDL_ANDROID_PROJECT" "$ANDROID_BUILD_DIR"
+    fi
+    # Only copy/replace main.c if it changed
+    print_status "Checking if main.c needs to be updated..."
+    if [ -f "main-android.c" ]; then
+        if ! cmp -s "main-android.c" "$ANDROID_BUILD_DIR/app/jni/src/main.c"; then
+            print_status "Updating main.c for Android..."
+            cp main-android.c "$ANDROID_BUILD_DIR/app/jni/src/main.c"
+        fi
+    else
+        if ! cmp -s "main.c" "$ANDROID_BUILD_DIR/app/jni/src/main.c"; then
+            print_status "Updating main.c..."
+            cp main.c "$ANDROID_BUILD_DIR/app/jni/src/main.c"
+        fi
+    fi
     # Update Android.mk to use our source file
     print_status "Updating Android.mk..."
     sed -i 's/YourSourceHere\.c/main.c/' "$ANDROID_BUILD_DIR/app/jni/src/Android.mk"
-    
     # Update Application.mk for better compatibility
     print_status "Updating Application.mk..."
     cat > "$ANDROID_BUILD_DIR/app/jni/Application.mk" << EOF
@@ -156,14 +164,21 @@ APP_STL := c++_static
 APP_OPTIM := $BUILD_TYPE
 APP_CPPFLAGS += -fexceptions -frtti
 EOF
-    
     # Create local.properties file for Gradle
     print_status "Creating local.properties..."
     cat > "$ANDROID_BUILD_DIR/local.properties" << EOF
 sdk.dir=/home/rebroad/Android/sdk
 ndk.dir=$NDK_PATH
 EOF
-    
+    # Copy custom app icon to all mipmap directories
+    print_status "Copying custom app icon to mipmap directories..."
+    for size in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+        icon_src="icon_tmp/ic_launcher_${size}.png"
+        icon_dst="$ANDROID_BUILD_DIR/app/src/main/res/mipmap-${size}/ic_launcher.png"
+        if [ -f "$icon_src" ]; then
+            cp "$icon_src" "$icon_dst"
+        fi
+    done
     print_success "Android project prepared"
 }
 
@@ -220,16 +235,18 @@ install_apk() {
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [BUILD_TYPE] [ABI]"
+    echo "Usage: $0 [BUILD_TYPE] [ABI] [--install-only]"
     echo ""
     echo "BUILD_TYPE: release (default) or debug"
     echo "ABI: armeabi-v7a, arm64-v8a (default), x86, x86_64, or all"
+    echo "--install-only: Install existing APK without rebuilding"
     echo ""
     echo "Examples:"
     echo "  $0                    # Build release for arm64-v8a"
     echo "  $0 debug              # Build debug for arm64-v8a"
     echo "  $0 release all        # Build release for all ABIs"
     echo "  $0 debug armeabi-v7a # Build debug for armeabi-v7a"
+    echo "  $0 --install-only     # Install existing APK only"
 }
 
 # Main execution
@@ -239,6 +256,32 @@ main() {
     # Check arguments
     if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         show_usage
+        exit 0
+    fi
+    
+    # Check for install-only mode
+    INSTALL_ONLY=false
+    for arg in "$@"; do
+        if [ "$arg" = "--install-only" ]; then
+            INSTALL_ONLY=true
+            break
+        fi
+    done
+    
+    if [ "$INSTALL_ONLY" = true ]; then
+        print_status "Install-only mode: Installing existing APK"
+        # Check for existing APK files
+        if [ -f "helloworld-android-debug.apk" ]; then
+            print_status "Found debug APK, installing..."
+            adb install -r "helloworld-android-debug.apk"
+        elif [ -f "helloworld-android-release.apk" ]; then
+            print_status "Found release APK, installing..."
+            adb install -r "helloworld-android-release.apk"
+        else
+            print_error "No APK found. Please build first with: ./build-android.sh [debug|release]"
+            exit 1
+        fi
+        print_success "APK installation completed!"
         exit 0
     fi
     
@@ -262,6 +305,21 @@ main() {
     
     print_status "Build type: $BUILD_TYPE"
     print_status "Target ABI: $ABI"
+    
+    # Add --clean option
+    CLEAN_BUILD=false
+    for arg in "$@"; do
+        if [ "$arg" = "--clean" ]; then
+            CLEAN_BUILD=true
+            break
+        fi
+        if [ "$arg" = "--install-only" ]; then
+            # handled elsewhere
+            continue
+        fi
+        # allow other args
+        :
+    done
     
     # Run build steps
     check_android_sdk
