@@ -1,49 +1,63 @@
-# SDL2 Hello World
+# SDL Hello World
 
-A minimal SDL2 Hello World application that displays a blue window.
+A simple SDL Hello World application that works with both SDL2 and SDL3.
 
-## Prerequisites
+## Features
 
-- SDL2 source code (linked as `../SDL`)
-- Android NDK r27 (linked as `../../Android`)
-- GCC compiler (for Linux/Windows builds)
-- MinGW-w64 (for Windows cross-compilation)
+- **SDL2/SDL3 Compatibility**: Automatically detects whether the SDL directory contains SDL2 or SDL3
+- **Cross-platform Build Scripts**: 
+  - `build-linux.sh` - Builds for Linux
+  - `build-windows.sh` - Cross-compiles for Windows using MinGW
+- **System-wide SDL Detection**: Uses system-installed SDL if available, otherwise builds from source
+- **API Compatibility**: Handles differences between SDL2 and SDL3 APIs
 
-## Building
+## Requirements
 
-### Linux
+### For Linux builds:
+- GCC compiler
+- Make
+- For SDL3 builds: CMake (`sudo apt-get install cmake`)
+
+### For Windows cross-compilation:
+- MinGW-w64 cross-compiler (`sudo apt-get install mingw-w64`)
+- CMake (for SDL3 builds)
+
+## Usage
+
+### Linux Build
 ```bash
-make linux
-./helloworld
+./build-linux.sh
 ```
 
-### Windows (cross-compile from Linux)
+### Windows Cross-compilation
 ```bash
-# Install MinGW-w64 first: sudo apt install mingw-w64
-make windows
-# Copy helloworld.exe to Windows and run
+./build-windows.sh
 ```
 
-### Android
-```bash
-# Build for all architectures
-../../Android/ndk-r27/ndk-build
+## SDL Version Detection
 
-# Or build for specific architecture
-../../Android/ndk-r27/ndk-build APP_ABI=arm64-v8a
-```
+The build scripts automatically detect the SDL version by checking for:
+- `SDL/include/SDL3/` directory → SDL3
+- `SDL/include/SDL2/` directory → SDL2
 
-## Project Structure
+## API Differences Handled
 
-- `main.c` - Source code
-- `Makefile` - Linux/Windows build configuration
-- `Android.mk` - Android build configuration
-- `Application.mk` - Android build settings
-- `../SDL` - Symbolic link to SDL2 source
-- `../../Android` - Symbolic link to Android NDK
+The `main.c` file uses conditional compilation to handle API differences:
 
-## Notes
+- **SDL2**: Uses `SDL_MAIN_HANDLED`, `SDL_main.h`, `SDL_WINDOW_SHOWN` flag
+- **SDL3**: Uses `SDL_WINDOW_OPENGL` flag, different renderer creation
 
-- The app creates a 640x480 window with a cornflower blue background
-- It runs for 3 seconds then exits
-- For Android, you'll need to create an APK with the built libraries 
+## Build Process
+
+1. **Version Detection**: Scripts detect SDL2 vs SDL3
+2. **System Check**: Look for system-wide SDL installation
+3. **Source Build**: If not found, build from source using appropriate method:
+   - SDL2: Autotools (`./configure`)
+   - SDL3: CMake
+4. **Compilation**: Compile with appropriate flags and libraries
+
+## Troubleshooting
+
+- **CMake not found**: Install with `sudo apt-get install cmake`
+- **MinGW not found**: Install with `sudo apt-get install mingw-w64`
+- **SDL not detected**: Ensure SDL directory contains either SDL2 or SDL3 headers 
