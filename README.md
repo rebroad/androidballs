@@ -4,8 +4,8 @@ A minimal SDL2 Hello World application that displays a blue window.
 
 ## Prerequisites
 
-- SDL2 source code (linked as `...SDL`)
-- Android NDK r27 (linked as `...Android`)
+- SDL2 source code (linked as `../SDL`)
+- Android NDK r27 (linked as `../../Android`)
 - GCC compiler (for Linux/Windows builds)
 - MinGW-w64 (for Windows cross-compilation)
 
@@ -27,10 +27,10 @@ make windows
 ### Android
 ```bash
 # Build for all architectures
-...Android/ndk-r27/ndk-build
+../../Android/ndk-r27/ndk-build
 
 # Or build for specific architecture
-...Android/ndk-r27/ndk-build APP_ABI=arm64-v8a
+../../Android/ndk-r27/ndk-build APP_ABI=arm64-v8a
 ```
 
 ## Project Structure
@@ -39,8 +39,8 @@ make windows
 - `Makefile` - Linux/Windows build configuration
 - `Android.mk` - Android build configuration
 - `Application.mk` - Android build settings
-- `...SDL` - Symbolic link to SDL2 source
-- `...Android` - Symbolic link to Android NDK
+- `../SDL` - Symbolic link to SDL2 source
+- `../../Android` - Symbolic link to Android NDK
 
 ## Notes
 

@@ -7,7 +7,7 @@ CFLAGS = -Wall -Wextra -std=c99 -O2
 LDFLAGS = -lSDL2 -lm
 
 # SDL2 paths (adjust these if needed)
-SDL_INCLUDE = ...SDL/include
+SDL_INCLUDE = ../SDL/include
 SDL_LIB = 
 
 # Source files
