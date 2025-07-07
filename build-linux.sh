@@ -61,10 +61,8 @@ if [ "$USE_SYSTEM_SDL" = "false" ]; then
     else # SDL3
         # SDL3 uses CMake
         if ! command -v cmake &> /dev/null; then
-            echo "Error: cmake is required to build SDL3 from source."
-            echo "Please install cmake: sudo apt-get install cmake"
-            echo "Or use system SDL3 if available."
-            exit 1
+            echo "cmake is required to build SDL3 from source. Installing cmake..."
+            sudo apt-get update && sudo apt-get install -y cmake
         fi
         cmake ../SDL -DCMAKE_INSTALL_PREFIX=$(pwd)/install -DSDL_STATIC=ON -DSDL_SHARED=OFF
         make -j$(nproc)
@@ -82,7 +80,7 @@ if [ "$USE_SYSTEM_SDL" = "false" ]; then
         SDL_CFLAGS="-I/usr/local/include/SDL2"
         SDL_LIBS="-L/usr/local/lib -lSDL2"
     else # SDL3
-        SDL_CFLAGS="-I/usr/local/include/SDL3"
+        SDL_CFLAGS="-I/usr/local/include"
         SDL_LIBS="-L/usr/local/lib -lSDL3"
     fi
 fi

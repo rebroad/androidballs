@@ -45,7 +45,7 @@ if [ "$SDL_VERSION" = "SDL2" ]; then
 else # SDL3
     if [ -d "$WINDOWS_SDL_DIR/include/SDL3" ] && [ -d "$WINDOWS_SDL_DIR/lib" ]; then
         echo "Windows SDL3 found system-wide, using it..."
-        SDL_CFLAGS="-I$WINDOWS_SDL_DIR/include/SDL3"
+        SDL_CFLAGS="-I$WINDOWS_SDL_DIR/include"
         SDL_LIBS="-L$WINDOWS_SDL_DIR/lib -lSDL3"
         USE_SYSTEM_SDL=true
     else
@@ -76,10 +76,8 @@ if [ "$USE_SYSTEM_SDL" = "false" ]; then
     else # SDL3
         # SDL3 uses CMake
         if ! command -v cmake &> /dev/null; then
-            echo "Error: cmake is required to build SDL3 from source."
-            echo "Please install cmake: sudo apt-get install cmake"
-            echo "Or use system SDL3 if available."
-            exit 1
+            echo "cmake is required to build SDL3 from source. Installing cmake..."
+            sudo apt-get update && sudo apt-get install -y cmake
         fi
         cmake ../../SDL \
             -DCMAKE_INSTALL_PREFIX=$(pwd)/install \
@@ -101,7 +99,7 @@ if [ "$USE_SYSTEM_SDL" = "false" ]; then
         SDL_CFLAGS="-I$WINDOWS_SDL_DIR/include/SDL2"
         SDL_LIBS="-L$WINDOWS_SDL_DIR/lib -lSDL2"
     else # SDL3
-        SDL_CFLAGS="-I$WINDOWS_SDL_DIR/include/SDL3"
+        SDL_CFLAGS="-I$WINDOWS_SDL_DIR/include"
         SDL_LIBS="-L$WINDOWS_SDL_DIR/lib -lSDL3"
     fi
 fi
@@ -114,12 +112,14 @@ if [ "$SDL_VERSION" = "SDL2" ]; then
         $SDL_CFLAGS \
         -DSDL2 \
         -o helloworld.exe main.c \
-        -lSDL2main $SDL_LIBS -lm
+        -lSDL2main $SDL_LIBS -lm \
+        -lwinmm -lole32 -loleaut32 -lsetupapi -limm32 -lversion -luuid -luser32 -lgdi32 -lcomdlg32 -lshell32 -ladvapi32
 else # SDL3
-    x86_64-w64-mingw32-gcc -Wall -Wextra -std=c99 -O2 \
+    x86_64-w64-mingw32-gcc -Wall -Wextra -std=c99 -O2 -s -flto \
         $SDL_CFLAGS \
         -o helloworld.exe main.c \
-        $SDL_LIBS -lm
+        $SDL_LIBS -lm \
+        -lwinmm -lole32 -loleaut32 -lsetupapi -limm32 -lversion -luuid -luser32 -lgdi32 -lcomdlg32 -lshell32 -ladvapi32
 fi
 
 echo "Windows build complete! Executable: helloworld.exe" 
