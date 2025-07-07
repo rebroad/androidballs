@@ -1,168 +1,152 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <android/log.h>
+#include <math.h>
 
-#define LOG_TAG "SDLHelloWorld"
+#define LOG_TAG "PhysicsDemo"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-#define NUM_OBJECTS 50
+#define NUM_BALLS 6
+#define GRAVITY 0.3f
+#define FRICTION 0.99f
+#define BOUNCE 0.8f
 
-static int num_objects = NUM_OBJECTS;
-static bool cycle_color = true;
-static bool cycle_alpha = true;
-static int cycle_direction = 1;
-static int current_alpha = 255;
-static int current_color = 255;
-static Uint64 next_fps_check;
-static Uint32 frames;
-static const int fps_check_delay = 5000;
-
-static void DrawPoints(SDL_Renderer *renderer)
-{
-    int i;
+typedef struct {
     float x, y;
-    SDL_Rect viewport;
+    float vx, vy;
+    float radius;
+    int r, g, b;
+} PhysicsBall;
 
-    /* Query the sizes */
-    SDL_GetRenderViewport(renderer, &viewport);
+static PhysicsBall balls[NUM_BALLS];
+static float accel_x = 0, accel_y = 0;
+static float gyro_x = 0, gyro_y = 0;
 
-    for (i = 0; i < num_objects * 4; ++i) {
-        /* Cycle the color and alpha, if desired */
-        if (cycle_color) {
-            current_color += cycle_direction;
-            if (current_color < 0) {
-                current_color = 0;
-                cycle_direction = -cycle_direction;
-            }
-            if (current_color > 255) {
-                current_color = 255;
-                cycle_direction = -cycle_direction;
-            }
-        }
-        if (cycle_alpha) {
-            current_alpha += cycle_direction;
-            if (current_alpha < 0) {
-                current_alpha = 0;
-                cycle_direction = -cycle_direction;
-            }
-            if (current_alpha > 255) {
-                current_alpha = 255;
-                cycle_direction = -cycle_direction;
-            }
-        }
-        SDL_SetRenderDrawColor(renderer, 255, (Uint8)current_color,
-                               (Uint8)current_color, (Uint8)current_alpha);
-
-        x = (float)SDL_rand(viewport.w);
-        y = (float)SDL_rand(viewport.h);
-        SDL_RenderPoint(renderer, x, y);
-    }
-}
-
-static void DrawLines(SDL_Renderer *renderer)
-{
-    int i;
-    float x1, y1, x2, y2;
-    SDL_Rect viewport;
-
-    /* Query the sizes */
-    SDL_GetRenderViewport(renderer, &viewport);
-
-    for (i = 0; i < num_objects; ++i) {
-        /* Cycle the color and alpha, if desired */
-        if (cycle_color) {
-            current_color += cycle_direction;
-            if (current_color < 0) {
-                current_color = 0;
-                cycle_direction = -cycle_direction;
-            }
-            if (current_color > 255) {
-                current_color = 255;
-                cycle_direction = -cycle_direction;
-            }
-        }
-        if (cycle_alpha) {
-            current_alpha += cycle_direction;
-            if (current_alpha < 0) {
-                current_alpha = 0;
-                cycle_direction = -cycle_direction;
-            }
-            if (current_alpha > 255) {
-                current_alpha = 255;
-                cycle_direction = -cycle_direction;
-            }
-        }
-        SDL_SetRenderDrawColor(renderer, 255, (Uint8)current_color,
-                               (Uint8)current_color, (Uint8)current_alpha);
-
-        if (i == 0) {
-            SDL_RenderLine(renderer, 0.0f, 0.0f, (float)(viewport.w - 1), (float)(viewport.h - 1));
-            SDL_RenderLine(renderer, 0.0f, (float)(viewport.h - 1), (float)(viewport.w - 1), 0.0f);
-            SDL_RenderLine(renderer, 0.0f, (float)(viewport.h / 2), (float)(viewport.w - 1), (float)(viewport.h / 2));
-            SDL_RenderLine(renderer, (float)(viewport.w / 2), 0.0f, (float)(viewport.w / 2), (float)(viewport.h - 1));
-        } else {
-            x1 = (float)(SDL_rand(viewport.w * 2) - viewport.w);
-            x2 = (float)(SDL_rand(viewport.w * 2) - viewport.w);
-            y1 = (float)(SDL_rand(viewport.h * 2) - viewport.h);
-            y2 = (float)(SDL_rand(viewport.h * 2) - viewport.h);
-            SDL_RenderLine(renderer, x1, y1, x2, y2);
+// Initialize physics balls
+static void init_balls(int screen_w, int screen_h) {
+    for (int i = 0; i < NUM_BALLS; i++) {
+        balls[i].x = (float)(SDL_rand(screen_w / 2) + screen_w / 4);
+        balls[i].y = (float)(SDL_rand(screen_h / 2) + screen_h / 4);
+        balls[i].vx = (float)(SDL_rand(100) - 50) / 25.0f;
+        balls[i].vy = (float)(SDL_rand(100) - 50) / 25.0f;
+        balls[i].radius = 40.0f;
+        
+        // Use distinct colors
+        switch (i % 6) {
+            case 0: balls[i].r = 255; balls[i].g = 100; balls[i].b = 100; break; // Red
+            case 1: balls[i].r = 100; balls[i].g = 255; balls[i].b = 100; break; // Green
+            case 2: balls[i].r = 100; balls[i].g = 100; balls[i].b = 255; break; // Blue
+            case 3: balls[i].r = 255; balls[i].g = 255; balls[i].b = 100; break; // Yellow
+            case 4: balls[i].r = 255; balls[i].g = 100; balls[i].b = 255; break; // Magenta
+            case 5: balls[i].r = 100; balls[i].g = 255; balls[i].b = 255; break; // Cyan
         }
     }
 }
 
-static void DrawRects(SDL_Renderer *renderer)
-{
-    int i;
-    SDL_FRect rect;
-    SDL_Rect viewport;
+// Update physics
+static void update_physics(int screen_w, int screen_h, float delta_time) {
+    for (int i = 0; i < NUM_BALLS; i++) {
+        PhysicsBall *ball = &balls[i];
+        
+        // Apply gravity based on phone orientation
+        float gravity_x = accel_x * GRAVITY;
+        float gravity_y = accel_y * GRAVITY;
+        
+        // Apply gyroscope rotation (gentler)
+        ball->vx += gyro_y * delta_time * 0.05f;
+        ball->vy -= gyro_x * delta_time * 0.05f;
+        
+        // Apply gravity
+        ball->vx += gravity_x;
+        ball->vy += gravity_y;
+        
+        // Apply friction
+        ball->vx *= FRICTION;
+        ball->vy *= FRICTION;
+        
+        // Update position
+        ball->x += ball->vx;
+        ball->y += ball->vy;
+        
+        // Bounce off walls
+        if (ball->x - ball->radius < 0) {
+            ball->x = ball->radius;
+            ball->vx = -ball->vx * BOUNCE;
+        } else if (ball->x + ball->radius > screen_w) {
+            ball->x = screen_w - ball->radius;
+            ball->vx = -ball->vx * BOUNCE;
+        }
+        
+        if (ball->y - ball->radius < 0) {
+            ball->y = ball->radius;
+            ball->vy = -ball->vy * BOUNCE;
+        } else if (ball->y + ball->radius > screen_h) {
+            ball->y = screen_h - ball->radius;
+            ball->vy = -ball->vy * BOUNCE;
+        }
+        
+        // Keep balls on screen
+        if (ball->x < ball->radius) ball->x = ball->radius;
+        if (ball->x > screen_w - ball->radius) ball->x = screen_w - ball->radius;
+        if (ball->y < ball->radius) ball->y = ball->radius;
+        if (ball->y > screen_h - ball->radius) ball->y = screen_h - ball->radius;
+    }
+}
 
-    /* Query the sizes */
-    SDL_GetRenderViewport(renderer, &viewport);
-
-    for (i = 0; i < num_objects / 4; ++i) {
-        /* Cycle the color and alpha, if desired */
-        if (cycle_color) {
-            current_color += cycle_direction;
-            if (current_color < 0) {
-                current_color = 0;
-                cycle_direction = -cycle_direction;
-            }
-            if (current_color > 255) {
-                current_color = 255;
-                cycle_direction = -cycle_direction;
+// Draw physics balls
+static void draw_balls(SDL_Renderer *renderer) {
+    for (int i = 0; i < NUM_BALLS; i++) {
+        PhysicsBall *ball = &balls[i];
+        
+        // Draw filled circle
+        SDL_SetRenderDrawColor(renderer, ball->r, ball->g, ball->b, 255);
+        
+        int radius = (int)ball->radius;
+        int center_x = (int)ball->x;
+        int center_y = (int)ball->y;
+        
+        // Draw circle using points
+        for (int dx = -radius; dx <= radius; dx += 2) {
+            for (int dy = -radius; dy <= radius; dy += 2) {
+                if (dx*dx + dy*dy <= radius*radius) {
+                    SDL_RenderPoint(renderer, center_x + dx, center_y + dy);
+                }
             }
         }
-        if (cycle_alpha) {
-            current_alpha += cycle_direction;
-            if (current_alpha < 0) {
-                current_alpha = 0;
-                cycle_direction = -cycle_direction;
-            }
-            if (current_alpha > 255) {
-                current_alpha = 255;
-                cycle_direction = -cycle_direction;
-            }
-        }
-        SDL_SetRenderDrawColor(renderer, 255, (Uint8)current_color,
-                               (Uint8)current_color, (Uint8)current_alpha);
+    }
+}
 
-        rect.w = (float)SDL_rand(viewport.h / 2);
-        rect.h = (float)SDL_rand(viewport.h / 2);
-        rect.x = (SDL_rand(viewport.w * 2) - viewport.w) - (rect.w / 2);
-        rect.y = (SDL_rand(viewport.h * 2) - viewport.h) - (rect.h / 2);
-        SDL_RenderFillRect(renderer, &rect);
+// Handle sensor events
+static void handle_sensor_event(SDL_SensorEvent *event) {
+    SDL_Sensor *sensor = SDL_GetSensorFromID(event->which);
+    if (!sensor) return;
+    
+    SDL_SensorType type = SDL_GetSensorType(sensor);
+    switch (type) {
+        case SDL_SENSOR_ACCEL:
+            accel_x = event->data[0];
+            accel_y = event->data[1];
+            LOGI("Accel: %.2f, %.2f", accel_x, accel_y);
+            break;
+        case SDL_SENSOR_GYRO:
+            gyro_x = event->data[0];
+            gyro_y = event->data[1];
+            LOGI("Gyro: %.2f, %.2f", gyro_x, gyro_y);
+            break;
+        default:
+            break;
     }
 }
 
 int main(int argc, char *argv[]) {
     (void)argc; (void)argv;
     
-    LOGI("=== SDL Drawing Test Starting ===");
+    LOGI("=== Physics Demo Starting ===");
     
     // Initialize SDL
     LOGI("Initializing SDL...");
-    if (!SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO)) {
+    if (!SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_SENSOR)) {
         LOGE("SDL_Init failed (%s)", SDL_GetError());
         return 1;
     }
@@ -172,7 +156,7 @@ int main(int argc, char *argv[]) {
     LOGI("Creating window and renderer...");
     SDL_Window *win = NULL;
     SDL_Renderer *ren = NULL;
-    SDL_CreateWindowAndRenderer("SDL Drawing Test", 800, 600, SDL_WINDOW_RESIZABLE, &win, &ren);
+    SDL_CreateWindowAndRenderer("Physics Demo", 800, 600, SDL_WINDOW_RESIZABLE, &win, &ren);
     if (!win || !ren) {
         LOGE("Failed to create window or renderer: %s", SDL_GetError());
         SDL_Quit();
@@ -180,13 +164,54 @@ int main(int argc, char *argv[]) {
     }
     LOGI("Window and renderer created successfully");
     
+    // Get window size
+    int screen_w, screen_h;
+    SDL_GetWindowSize(win, &screen_w, &screen_h);
+    
+    // Initialize physics balls
+    init_balls(screen_w, screen_h);
+    LOGI("Initialized %d physics balls", NUM_BALLS);
+    
+    // Open sensors
+    LOGI("Opening motion sensors...");
+    SDL_SensorID *sensors;
+    int num_sensors;
+    sensors = SDL_GetSensors(&num_sensors);
+    LOGI("Found %d sensors", num_sensors);
+    
+    if (sensors) {
+        for (int i = 0; i < num_sensors; i++) {
+            SDL_SensorType type = SDL_GetSensorTypeForID(sensors[i]);
+            if (type == SDL_SENSOR_ACCEL) {
+                SDL_Sensor *sensor = SDL_OpenSensor(sensors[i]);
+                if (sensor) {
+                    LOGI("Opened accelerometer sensor");
+                } else {
+                    LOGE("Failed to open accelerometer sensor");
+                }
+            } else if (type == SDL_SENSOR_GYRO) {
+                SDL_Sensor *sensor = SDL_OpenSensor(sensors[i]);
+                if (sensor) {
+                    LOGI("Opened gyroscope sensor");
+                } else {
+                    LOGE("Failed to open gyroscope sensor");
+                }
+            }
+        }
+        SDL_free(sensors);
+    }
+    
     // Main event loop
     int quit = 0;
     SDL_Event event;
-    Uint64 start_ticks = SDL_GetTicks();
+    Uint64 last_time = SDL_GetTicks();
     
     LOGI("Entering main event loop...");
     while (!quit) {
+        Uint64 current_time = SDL_GetTicks();
+        float delta_time = (current_time - last_time) / 1000.0f;
+        last_time = current_time;
+        
         // Handle events
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
@@ -203,29 +228,27 @@ int main(int argc, char *argv[]) {
                     LOGI("Window close event received");
                     quit = 1;
                     break;
+                case SDL_EVENT_SENSOR_UPDATE:
+                    handle_sensor_event(&event.sensor);
+                    break;
             }
         }
         
+        // Update physics
+        update_physics(screen_w, screen_h, delta_time);
+        
         // Clear screen
-        SDL_SetRenderDrawColor(ren, 0xA0, 0xA0, 0xA0, 0xFF);
+        SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
         SDL_RenderClear(ren);
         
-        // Draw animated shapes
-        DrawRects(ren);
-        DrawLines(ren);
-        DrawPoints(ren);
+        // Draw physics balls
+        draw_balls(ren);
         
         // Present the render
         SDL_RenderPresent(ren);
         
         // Cap frame rate
         SDL_Delay(16); // ~60 FPS
-        
-        // Exit after 10 seconds
-        if (SDL_GetTicks() - start_ticks > 10000) {
-            LOGI("10 seconds elapsed, exiting...");
-            quit = 1;
-        }
     }
     
     LOGI("Cleaning up...");
@@ -233,6 +256,6 @@ int main(int argc, char *argv[]) {
     SDL_DestroyWindow(win);
     SDL_Quit();
     
-    LOGI("=== SDL Drawing Test Exiting ===");
+    LOGI("=== Physics Demo Exiting ===");
     return 0;
 } 
