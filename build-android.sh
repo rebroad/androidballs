@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 ANDROID_SDK_PATH="/home/rebroad/Android/sdk"
 ANDROID_NDK_PATH="$ANDROID_SDK_PATH/ndk"
 SDL_ANDROID_PROJECT="SDL/android-project"
-BUILD_TYPE="${1:-release}"  # release or debug
+BUILD_TYPE="${1:-debug}"  # debug or release
 ABI="${2:-arm64-v8a}"       # armeabi-v7a, arm64-v8a, x86, x86_64, or all
 APP_NAME="${3:-"PhysicsDemo"}"
 
@@ -287,7 +287,7 @@ install_apk() {
 show_usage() {
     echo "Usage: $0 [BUILD_TYPE] [ABI] [APP_NAME]"
     echo ""
-    echo "BUILD_TYPE: release (default) or debug"
+    echo "BUILD_TYPE: debug (default) or release"
     echo "ABI: armeabi-v7a, arm64-v8a (default), x86, x86_64, or all"
     echo "APP_NAME: Unique name for the app (default: PhysicsDemo)"
     echo ""

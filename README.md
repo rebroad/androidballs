@@ -23,7 +23,7 @@ A multi-platform SDL application with two variants:
 
 ### Android - Physics Demo
 ```bash
-# Build and install physics simulation APK
+# Build and install physics simulation APK (debug by default)
 ./build-android.sh
 ```
 
