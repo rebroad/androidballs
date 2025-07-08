@@ -22,6 +22,8 @@ typedef struct {
 static PhysicsBall balls[NUM_BALLS];
 static float accel_x = 0, accel_y = 0;
 static float gyro_x = 0, gyro_y = 0;
+static int accel_calibrated = 0;
+static float accel_x0 = 0, accel_y0 = 0; // calibration baseline
 
 // Initialize physics balls
 static void init_balls(int screen_w, int screen_h) {
@@ -31,15 +33,14 @@ static void init_balls(int screen_w, int screen_h) {
         balls[i].vx = (float)(SDL_rand(100) - 50) / 25.0f;
         balls[i].vy = (float)(SDL_rand(100) - 50) / 25.0f;
         balls[i].radius = 40.0f;
-
-        // Use distinct colors
+        // Use fully saturated, bright colors
         switch (i % 6) {
-            case 0: balls[i].r = 255; balls[i].g = 100; balls[i].b = 100; break; // Red
-            case 1: balls[i].r = 100; balls[i].g = 255; balls[i].b = 100; break; // Green
-            case 2: balls[i].r = 100; balls[i].g = 100; balls[i].b = 255; break; // Blue
-            case 3: balls[i].r = 255; balls[i].g = 255; balls[i].b = 100; break; // Yellow
-            case 4: balls[i].r = 255; balls[i].g = 100; balls[i].b = 255; break; // Magenta
-            case 5: balls[i].r = 100; balls[i].g = 255; balls[i].b = 255; break; // Cyan
+            case 0: balls[i].r = 255; balls[i].g = 0; balls[i].b = 0; break; // Red
+            case 1: balls[i].r = 0; balls[i].g = 255; balls[i].b = 0; break; // Green
+            case 2: balls[i].r = 0; balls[i].g = 0; balls[i].b = 255; break; // Blue
+            case 3: balls[i].r = 255; balls[i].g = 255; balls[i].b = 0; break; // Yellow
+            case 4: balls[i].r = 255; balls[i].g = 0; balls[i].b = 255; break; // Magenta
+            case 5: balls[i].r = 0; balls[i].g = 255; balls[i].b = 255; break; // Cyan
         }
     }
 }
@@ -97,6 +98,7 @@ static void resolve_ball_collision(PhysicsBall *ball1, PhysicsBall *ball2) {
 
 // Update physics
 static void update_physics(int screen_w, int screen_h, float delta_time) {
+    float gyro_multiplier = 0.5f; // Make gyro effect more visible
     for (int i = 0; i < NUM_BALLS; i++) {
         PhysicsBall *ball = &balls[i];
 
@@ -104,9 +106,12 @@ static void update_physics(int screen_w, int screen_h, float delta_time) {
         float gravity_x = -accel_x * GRAVITY;
         float gravity_y = accel_y * GRAVITY;
 
-        // Apply gyroscope rotation (gentler)
-        ball->vx -= gyro_y * delta_time * 0.05f;
-        ball->vy += gyro_x * delta_time * 0.05f;
+        // Apply gyroscope rotation (more visible)
+        ball->vx -= gyro_y * delta_time * gyro_multiplier;
+        ball->vy += gyro_x * delta_time * gyro_multiplier;
+        if (i == 0 && (fabsf(gyro_x) > 0.01f || fabsf(gyro_y) > 0.01f)) {
+            LOGI("Gyro effect on ball0: vx=%.2f vy=%.2f", ball->vx, ball->vy);
+        }
 
         // Apply gravity
         ball->vx += gravity_x;
@@ -183,9 +188,15 @@ static void handle_sensor_event(SDL_SensorEvent *event) {
     SDL_SensorType type = SDL_GetSensorType(sensor);
     switch (type) {
         case SDL_SENSOR_ACCEL:
-            accel_x = event->data[0];
-            accel_y = event->data[1];
-            LOGI("Accel: %.2f, %.2f", accel_x, accel_y);
+            if (!accel_calibrated) {
+                accel_x0 = event->data[0];
+                accel_y0 = event->data[1];
+                accel_calibrated = 1;
+                LOGI("Calibrated flat position: %.2f, %.2f", accel_x0, accel_y0);
+            }
+            accel_x = event->data[0] - accel_x0;
+            accel_y = event->data[1] - accel_y0;
+            LOGI("Accel (calibrated): %.2f, %.2f", accel_x, accel_y);
             break;
         case SDL_SENSOR_GYRO:
             gyro_x = event->data[0];
@@ -211,16 +222,37 @@ int main(int argc, char *argv[]) {
     LOGI("SDL initialized successfully");
 
     // Create window and renderer
-    LOGI("Creating window and renderer...");
+    LOGI("Creating window..."); fflush(stdout);
     SDL_Window *win = NULL;
     SDL_Renderer *ren = NULL;
-    SDL_CreateWindowAndRenderer("Physics Demo", 800, 600, SDL_WINDOW_RESIZABLE, &win, &ren);
-    if (!win || !ren) {
-        LOGE("Failed to create window or renderer: %s", SDL_GetError());
+    win = SDL_CreateWindow("Physics Demo", 800, 600, SDL_WINDOW_RESIZABLE);
+    if (!win) {
+        LOGE("Failed to create window: %s", SDL_GetError()); fflush(stdout); fflush(stderr);
         SDL_Quit();
         return 1;
     }
-    LOGI("Window and renderer created successfully");
+    LOGI("Window created successfully"); fflush(stdout);
+#if defined(SDL2)
+    LOGI("Creating renderer (SDL2)..."); fflush(stdout);
+    ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+#else
+    LOGI("Creating renderer (SDL3, trying opengles2,presentvsync)..."); fflush(stdout);
+    ren = SDL_CreateRenderer(win, "opengles2,presentvsync");
+    if (!ren) {
+        LOGE("Failed to create opengles2,presentvsync renderer: %s", SDL_GetError()); fflush(stdout); fflush(stderr);
+        LOGI("Trying software renderer..."); fflush(stdout);
+        ren = SDL_CreateRenderer(win, "software");
+        if (!ren) {
+            LOGE("Failed to create software renderer: %s", SDL_GetError()); fflush(stdout); fflush(stderr);
+        }
+    }
+#endif
+    if (!ren) {
+        SDL_DestroyWindow(win);
+        SDL_Quit();
+        return 1;
+    }
+    LOGI("Renderer created successfully"); fflush(stdout);
 
     // Get window size
     int screen_w, screen_h;
