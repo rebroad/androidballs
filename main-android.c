@@ -225,30 +225,9 @@ int main(int argc, char *argv[]) {
     LOGI("Creating window..."); fflush(stdout);
     SDL_Window *win = NULL;
     SDL_Renderer *ren = NULL;
-    win = SDL_CreateWindow("Physics Demo", 800, 600, SDL_WINDOW_RESIZABLE);
-    if (!win) {
-        LOGE("Failed to create window: %s", SDL_GetError()); fflush(stdout); fflush(stderr);
-        SDL_Quit();
-        return 1;
-    }
-    LOGI("Window created successfully"); fflush(stdout);
-#if defined(SDL2)
-    LOGI("Creating renderer (SDL2)..."); fflush(stdout);
-    ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-#else
-    LOGI("Creating renderer (SDL3, trying opengles2,presentvsync)..."); fflush(stdout);
-    ren = SDL_CreateRenderer(win, "opengles2,presentvsync");
-    if (!ren) {
-        LOGE("Failed to create opengles2,presentvsync renderer: %s", SDL_GetError()); fflush(stdout); fflush(stderr);
-        LOGI("Trying software renderer..."); fflush(stdout);
-        ren = SDL_CreateRenderer(win, "software");
-        if (!ren) {
-            LOGE("Failed to create software renderer: %s", SDL_GetError()); fflush(stdout); fflush(stderr);
-        }
-    }
-#endif
-    if (!ren) {
-        SDL_DestroyWindow(win);
+    SDL_CreateWindowAndRenderer("Physics Demo", 800, 600, SDL_WINDOW_RESIZABLE, &win, &ren);
+    if (!win || !ren) {
+        LOGE("Failed to create window or renderer: %s", SDL_GetError());
         SDL_Quit();
         return 1;
     }
