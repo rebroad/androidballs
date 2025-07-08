@@ -25,6 +25,48 @@ static float gyro_x = 0, gyro_y = 0;
 static int accel_calibrated = 0;
 static float accel_x0 = 0, accel_y0 = 0; // calibration baseline
 
+// --- White center circle for breaking up lines ---
+typedef struct {
+    float x, y;
+    float radius;
+    int active;
+} CenterCircle;
+static CenterCircle center_circle = {0};
+
+// Helper: check if all balls are nearly in a line (all X or all Y nearly equal AND velocities in that axis nearly equal)
+static int balls_in_line(void) {
+    float eps = 1.0f, veps = 0.05f;
+    int all_x = 1, all_y = 1;
+    float x0 = balls[0].x, y0 = balls[0].y;
+    float vx0 = balls[0].vx, vy0 = balls[0].vy;
+    for (int i = 1; i < NUM_BALLS; i++) {
+        if (fabsf(balls[i].x - x0) > eps || fabsf(balls[i].vx - vx0) > veps) all_x = 0;
+        if (fabsf(balls[i].y - y0) > eps || fabsf(balls[i].vy - vy0) > veps) all_y = 0;
+    }
+    return all_x || all_y;
+}
+
+// Ball vs. center circle collision
+static void resolve_ball_center_collision(PhysicsBall *ball, CenterCircle *circle) {
+    float dx = ball->x - circle->x;
+    float dy = ball->y - circle->y;
+    float dist = sqrtf(dx*dx + dy*dy);
+    float min_dist = ball->radius + circle->radius;
+    if (dist < min_dist && dist > 0.0f) {
+        // Separate ball from circle
+        float nx = dx / dist, ny = dy / dist;
+        float overlap = min_dist - dist;
+        ball->x += nx * overlap;
+        ball->y += ny * overlap;
+        // Reflect velocity
+        float v_dot_n = ball->vx * nx + ball->vy * ny;
+        if (v_dot_n < 0) {
+            ball->vx -= 2 * v_dot_n * nx * BOUNCE;
+            ball->vy -= 2 * v_dot_n * ny * BOUNCE;
+        }
+    }
+}
+
 // Initialize physics balls
 static void init_balls(int screen_w, int screen_h) {
     for (int i = 0; i < NUM_BALLS; i++) {
@@ -155,10 +197,37 @@ static void update_physics(int screen_w, int screen_h, float delta_time) {
             resolve_ball_collision(&balls[i], &balls[j]);
         }
     }
+    // --- Center circle logic ---
+    if (!center_circle.active && balls_in_line()) {
+        center_circle.x = screen_w / 2.0f;
+        center_circle.y = screen_h / 2.0f;
+        center_circle.radius = 60.0f;
+        center_circle.active = 1;
+    }
+    if (center_circle.active) {
+        int any_not_in_line = !balls_in_line();
+        for (int i = 0; i < NUM_BALLS; i++) {
+            resolve_ball_center_collision(&balls[i], &center_circle);
+        }
+        if (any_not_in_line) center_circle.active = 0;
+    }
 }
 
 // Draw physics balls
 static void draw_balls(SDL_Renderer *renderer) {
+    // Draw center circle if active
+    if (center_circle.active) {
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        int radius = (int)center_circle.radius;
+        int cx = (int)center_circle.x, cy = (int)center_circle.y;
+        for (int dx = -radius; dx <= radius; dx += 2) {
+            for (int dy = -radius; dy <= radius; dy += 2) {
+                if (dx*dx + dy*dy <= radius*radius) {
+                    SDL_RenderPoint(renderer, cx + dx, cy + dy);
+                }
+            }
+        }
+    }
     for (int i = 0; i < NUM_BALLS; i++) {
         PhysicsBall *ball = &balls[i];
 
