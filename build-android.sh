@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Android build script for SDL Hello World
-# Uses SDL's Android project template and Android SDK
+# Android build script for SDL Physics Apps - Fixed version
+# Uses the working approach from build-android.sh with physics icons
 
 set -e
 
@@ -18,6 +18,7 @@ ANDROID_NDK_PATH="$ANDROID_SDK_PATH/ndk"
 SDL_ANDROID_PROJECT="SDL/android-project"
 BUILD_TYPE="${1:-release}"  # release or debug
 ABI="${2:-arm64-v8a}"       # armeabi-v7a, arm64-v8a, x86, x86_64, or all
+APP_NAME="${3:-"PhysicsDemo"}"
 
 # Function to print colored output
 print_status() {
@@ -126,18 +127,14 @@ check_sdl_android_project() {
 
 # Function to prepare Android project
 prepare_android_project() {
-    print_status "Preparing Android project..."
+    print_status "Preparing Android project for $APP_NAME..."
     ANDROID_BUILD_DIR="build-android"
-    if [ "$CLEAN_BUILD" = true ]; then
-        if [ -d "$ANDROID_BUILD_DIR" ]; then
-            print_status "Removing existing Android build directory (--clean)..."
-            rm -rf "$ANDROID_BUILD_DIR"
-        fi
-    fi
+    
     if [ ! -d "$ANDROID_BUILD_DIR" ]; then
         print_status "Copying SDL Android project template..."
         cp -r "$SDL_ANDROID_PROJECT" "$ANDROID_BUILD_DIR"
     fi
+    
     # Only copy/replace main.c if it changed
     print_status "Checking if main.c needs to be updated..."
     if [ -f "main-android.c" ]; then
@@ -151,40 +148,57 @@ prepare_android_project() {
             cp main.c "$ANDROID_BUILD_DIR/app/jni/src/main.c"
         fi
     fi
+    
     # Update Android.mk to use our source file
     print_status "Updating Android.mk..."
     sed -i 's/YourSourceHere\.c/main.c/' "$ANDROID_BUILD_DIR/app/jni/src/Android.mk"
+    
     # Update Application.mk for better compatibility
     print_status "Updating Application.mk..."
     cat > "$ANDROID_BUILD_DIR/app/jni/Application.mk" << EOF
-# Application.mk for SDL Hello World
+# Application.mk for $APP_NAME
 APP_PLATFORM := android-21
 APP_ABI := $ABI
 APP_STL := c++_static
 APP_OPTIM := $BUILD_TYPE
 APP_CPPFLAGS += -fexceptions -frtti
 EOF
+    
     # Create local.properties file for Gradle
     print_status "Creating local.properties..."
     cat > "$ANDROID_BUILD_DIR/local.properties" << EOF
 sdk.dir=/home/rebroad/Android/sdk
 ndk.dir=$NDK_PATH
 EOF
-    # Copy custom app icon to all mipmap directories
-    print_status "Copying custom app icon to mipmap directories..."
+    
+    # Generate physics demo icons if they don't exist
+    if [ ! -d "icon_physics_demo_tmp" ] || [ ! -f "icon_physics_demo_tmp/ic_launcher_mdpi.png" ]; then
+        print_status "Generating physics demo icons..."
+        if command -v python3 >/dev/null 2>&1; then
+            python3 generate_physics_icon.py
+        else
+            print_warning "Python3 not found, skipping icon generation"
+        fi
+    fi
+    
+    # Copy physics demo icon to all mipmap directories
+    print_status "Copying physics demo icon to mipmap directories..."
     for size in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-        icon_src="icon_tmp/ic_launcher_${size}.png"
+        icon_src="icon_physics_demo_tmp/ic_launcher_${size}.png"
         icon_dst="$ANDROID_BUILD_DIR/app/src/main/res/mipmap-${size}/ic_launcher.png"
         if [ -f "$icon_src" ]; then
             cp "$icon_src" "$icon_dst"
+        else
+            print_warning "Icon not found: $icon_src"
         fi
     done
-    print_success "Android project prepared"
+    
+    print_success "Android project prepared for $APP_NAME"
 }
 
 # Function to build Android APK
 build_android_apk() {
-    print_status "Building Android APK..."
+    print_status "Building Android APK for $APP_NAME..."
     
     cd "$ANDROID_BUILD_DIR"
     
@@ -195,24 +209,30 @@ build_android_apk() {
     # Build using Gradle
     print_status "Running Gradle build..."
     if [ "$BUILD_TYPE" = "debug" ]; then
-        ./gradlew assembleDebug
+        if ! ./gradlew assembleDebug; then
+            print_error "Gradle build failed"
+            exit 1
+        fi
         APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
     else
-        ./gradlew assembleRelease
+        if ! ./gradlew assembleRelease; then
+            print_error "Gradle build failed"
+            exit 1
+        fi
         APK_PATH="app/build/outputs/apk/release/app-release.apk"
     fi
     
     if [ ! -f "$APK_PATH" ]; then
-        print_error "APK build failed"
+        print_error "APK build failed - APK not found at $APK_PATH"
         exit 1
     fi
     
-    # Copy APK to project root
-    cp "$APK_PATH" "../helloworld-android-$BUILD_TYPE.apk"
+    # Copy APK to project root with unique name
+    cp "$APK_PATH" "../$APP_NAME-android-$BUILD_TYPE.apk"
     
     cd ..
     
-    print_success "Android APK built successfully: helloworld-android-$BUILD_TYPE.apk"
+    print_success "Android APK built successfully: $APP_NAME-android-$BUILD_TYPE.apk"
 }
 
 # Function to install APK on connected device
@@ -229,59 +249,31 @@ install_apk() {
     fi
     
     print_status "Installing APK on connected device..."
-    adb install -r "helloworld-android-$BUILD_TYPE.apk"
+    adb install -r "$APP_NAME-android-$BUILD_TYPE.apk"
     print_success "APK installed successfully"
 }
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [BUILD_TYPE] [ABI] [--install-only]"
+    echo "Usage: $0 [BUILD_TYPE] [ABI] [APP_NAME]"
     echo ""
     echo "BUILD_TYPE: release (default) or debug"
     echo "ABI: armeabi-v7a, arm64-v8a (default), x86, x86_64, or all"
-    echo "--install-only: Install existing APK without rebuilding"
+    echo "APP_NAME: Unique name for the app (default: PhysicsDemo)"
     echo ""
     echo "Examples:"
-    echo "  $0                    # Build release for arm64-v8a"
-    echo "  $0 debug              # Build debug for arm64-v8a"
-    echo "  $0 release all        # Build release for all ABIs"
-    echo "  $0 debug armeabi-v7a # Build debug for armeabi-v7a"
-    echo "  $0 --install-only     # Install existing APK only"
+    echo "  $0                                    # Build debug for arm64-v8a with default name"
+    echo "  $0 debug arm64-v8a PhysicsDemo       # Build debug with custom name"
+    echo "  $0 release all SensorTest             # Build release for all ABIs with custom name"
 }
 
 # Main execution
 main() {
-    print_status "Starting Android build for SDL Hello World"
+    print_status "Starting Android build for $APP_NAME"
     
     # Check arguments
     if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
         show_usage
-        exit 0
-    fi
-    
-    # Check for install-only mode
-    INSTALL_ONLY=false
-    for arg in "$@"; do
-        if [ "$arg" = "--install-only" ]; then
-            INSTALL_ONLY=true
-            break
-        fi
-    done
-    
-    if [ "$INSTALL_ONLY" = true ]; then
-        print_status "Install-only mode: Installing existing APK"
-        # Check for existing APK files
-        if [ -f "helloworld-android-debug.apk" ]; then
-            print_status "Found debug APK, installing..."
-            adb install -r "helloworld-android-debug.apk"
-        elif [ -f "helloworld-android-release.apk" ]; then
-            print_status "Found release APK, installing..."
-            adb install -r "helloworld-android-release.apk"
-        else
-            print_error "No APK found. Please build first with: ./build-android.sh [debug|release]"
-            exit 1
-        fi
-        print_success "APK installation completed!"
         exit 0
     fi
     
@@ -305,21 +297,7 @@ main() {
     
     print_status "Build type: $BUILD_TYPE"
     print_status "Target ABI: $ABI"
-    
-    # Add --clean option
-    CLEAN_BUILD=false
-    for arg in "$@"; do
-        if [ "$arg" = "--clean" ]; then
-            CLEAN_BUILD=true
-            break
-        fi
-        if [ "$arg" = "--install-only" ]; then
-            # handled elsewhere
-            continue
-        fi
-        # allow other args
-        :
-    done
+    print_status "App name: $APP_NAME"
     
     # Run build steps
     check_android_sdk
@@ -329,7 +307,8 @@ main() {
     install_apk
     
     print_success "Android build completed successfully!"
-    print_status "APK: helloworld-android-$BUILD_TYPE.apk"
+    print_status "APK: $APP_NAME-android-$BUILD_TYPE.apk"
+    print_status "Package name: org.libsdl.app (using original package)"
 }
 
 # Run main function
