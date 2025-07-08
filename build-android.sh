@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-ANDROID_SDK_PATH="../../Android/sdk"
+ANDROID_SDK_PATH="/home/rebroad/Android/sdk"
 ANDROID_NDK_PATH="$ANDROID_SDK_PATH/ndk"
 SDL_ANDROID_PROJECT="SDL/android-project"
 BUILD_TYPE="${1:-release}"  # release or debug
@@ -183,7 +183,7 @@ EOF
     
     # Copy physics demo icon to all mipmap directories
     print_status "Copying physics demo icon to mipmap directories..."
-    for size in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+    for size in mdpi hdpi xhdpi xxhdpi; do
         icon_src="icon_physics_demo_tmp/ic_launcher_${size}.png"
         icon_dst="$ANDROID_BUILD_DIR/app/src/main/res/mipmap-${size}/ic_launcher.png"
         if [ -f "$icon_src" ]; then
@@ -219,7 +219,37 @@ build_android_apk() {
             print_error "Gradle build failed"
             exit 1
         fi
-        APK_PATH="app/build/outputs/apk/release/app-release.apk"
+        # For release builds, check for both signed and unsigned APKs
+        if [ -f "app/build/outputs/apk/release/app-release.apk" ]; then
+            APK_PATH="app/build/outputs/apk/release/app-release.apk"
+        elif [ -f "app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
+            APK_PATH="app/build/outputs/apk/release/app-release-unsigned.apk"
+            print_warning "Using unsigned release APK (not signed for distribution)"
+        else
+            print_error "Release APK not found"
+            exit 1
+        fi
+
+        # --- Sign the release APK with debug keystore ---
+        SIGNED_APK="../$APP_NAME-android-$BUILD_TYPE-signed.apk"
+        DEBUG_KEYSTORE="$HOME/.android/debug.keystore"
+        APK_SIGNER=""
+        # Find apksigner in build-tools (try latest version first)
+        for version in "34.0.0" "33.0.1" "33.0.0" "32.0.0" "31.0.0" "30.0.3"; do
+            if [ -x "$ANDROID_SDK_PATH/build-tools/$version/apksigner" ]; then
+                APK_SIGNER="$ANDROID_SDK_PATH/build-tools/$version/apksigner"
+                break
+            fi
+        done
+        if [ -z "$APK_SIGNER" ]; then
+            print_error "apksigner not found in Android SDK build-tools. Please install build-tools."
+            print_error "Tried versions: 34.0.0, 33.0.1, 33.0.0, 32.0.0, 31.0.0, 30.0.3"
+            exit 1
+        fi
+        print_status "Signing release APK with debug keystore..."
+        "$APK_SIGNER" sign --ks "$DEBUG_KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$SIGNED_APK" "$APK_PATH"
+        APK_PATH="$SIGNED_APK"
+        print_success "Release APK signed: $SIGNED_APK"
     fi
     
     if [ ! -f "$APK_PATH" ]; then
