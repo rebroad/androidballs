@@ -50,12 +50,12 @@ static void update_physics(int screen_w, int screen_h, float delta_time) {
         PhysicsBall *ball = &balls[i];
         
         // Apply gravity based on phone orientation
-        float gravity_x = accel_x * GRAVITY;
+        float gravity_x = -accel_x * GRAVITY;
         float gravity_y = accel_y * GRAVITY;
         
         // Apply gyroscope rotation (gentler)
-        ball->vx += gyro_y * delta_time * 0.05f;
-        ball->vy -= gyro_x * delta_time * 0.05f;
+        ball->vx -= gyro_y * delta_time * 0.05f;
+        ball->vy += gyro_x * delta_time * 0.05f;
         
         // Apply gravity
         ball->vx += gravity_x;
