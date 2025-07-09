@@ -4,7 +4,7 @@ A real-time physics simulation built with SDL3 and compiled to WebAssembly.
 
 ## 🎮 Play Now
 
-**[Click here to play the game!](index.html)**
+**[Click here to play the game!](https://rebroad.github.io/androidballs/)**
 
 ## 📱 Mobile Support
 
