@@ -23,8 +23,8 @@ canvas.emscripten { border: 0px none; background-color: black; }
   display: inline-block;
   margin: 0;
   padding: 6px;
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
 }
 
 .spinner {
@@ -118,7 +118,7 @@ canvas.emscripten { border: 0px none; background-color: black; }
     <span id='controls'>
       <span><input type="checkbox" id="resize">Resize canvas</span>
       <span><input type="checkbox" id="pointerLock" checked>Lock/hide mouse pointer &nbsp;&nbsp;&nbsp;</span>
-      <span><input type="button" value="Fullscreen" onclick="Module.requestFullscreen(document.getElementById('pointerLock').checked, 
+      <span><input type="button" value="Fullscreen" onclick="Module.requestFullscreen(document.getElementById('pointerLock').checked,
                                                                                 document.getElementById('resize').checked)">
       </span>
     </span>
@@ -200,6 +200,64 @@ canvas.emscripten { border: 0px none; background-color: black; }
         Module.setStatus = (text) => {
           if (text) console.error('[post-exception status] ' + text);
         };
+
+        // Native window movement detection (no extension needed)
+        var lastWindowX = window.screenX;
+        var lastWindowY = window.screenY;
+        var windowMoveDetected = false;
+
+        function checkWindowMovement() {
+            var currentX = window.screenX;
+            var currentY = window.screenY;
+
+            if (currentX !== lastWindowX || currentY !== lastWindowY) {
+                var deltaX = currentX - lastWindowX;
+                var deltaY = currentY - lastWindowY;
+
+                // Dispatch custom event for the game to consume
+                var event = new CustomEvent('windowMoved', {
+                    detail: {
+                        x: currentX,
+                        y: currentY,
+                        deltaX: deltaX,
+                        deltaY: deltaY,
+                        timestamp: Date.now()
+                    }
+                });
+                document.dispatchEvent(event);
+
+                console.log(`Window moved: (${currentX}, ${currentY}) delta: (${deltaX}, ${deltaY})`);
+
+                lastWindowX = currentX;
+                lastWindowY = currentY;
+                windowMoveDetected = true;
+            }
+        }
+
+        // Check for window movement every 16ms (60fps)
+        setInterval(checkWindowMovement, 16);
+
+        // Listen for window movement events
+        document.addEventListener('windowMoved', function(event) {
+            // This event is available for the game to consume
+            // The SDL code will handle window movement through its own event system
+            console.log('Window movement detected:', event.detail);
+        });
+
+        // --- BROWSER EXTENSION INTEGRATION (OPTIONAL) ---
+        // To use the browser extension instead of native detection:
+        // 1. Copy browser-extension/ directory to your build-web/ folder
+        // 2. Load the extension script here:
+        /*
+        var script = document.createElement('script');
+        script.src = 'browser-extension/window-detector.js';
+        document.head.appendChild(script);
+
+        // The extension will automatically detect window movement and dispatch events
+        document.addEventListener('windowMovement', function(event) {
+            console.log('Extension detected movement:', event.detail);
+        });
+        */
       };
     </script>
     {{{ SCRIPT }}}
