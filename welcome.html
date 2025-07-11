@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to 3x2 Window Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .feature h3 {
+            margin-top: 0;
+            color: #4CAF50;
+        }
+        
+        .steps {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+        
+        .steps ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .steps li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .buttons {
+            text-align: center;
+            margin-top: 40px;
+        }
+        
+        .buttons .btn {
+            margin: 0 10px;
+        }
+        
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .warning h4 {
+            margin-top: 0;
+            color: #FFC107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Welcome to 3x2 Window Manager</h1>
+        <p class="subtitle">Enable enhanced window positioning for the 3x2 Physics Demo game</p>
+        
+        <div class="feature">
+            <h3>✨ What This Extension Does</h3>
+            <p>This browser extension enables window positioning capabilities for the 3x2 Physics Demo web game. It allows the game to move the browser window to optimal positions for enhanced gameplay interaction.</p>
+        </div>
+        
+        <div class="feature">
+            <h3>🔧 How It Works</h3>
+            <p>The extension injects window management capabilities into supported web pages, providing a secure way for the game to request window positioning with user permission.</p>
+        </div>
+        
+        <div class="steps">
+            <h3>📋 Getting Started</h3>
+            <ol>
+                <li><strong>Navigate to the game:</strong> Go to <code>http://localhost:8000</code> or <code>https://rebroad.github.io</code></li>
+                <li><strong>Grant permission:</strong> When prompted, allow the extension to manage window positioning</li>
+                <li><strong>Enjoy enhanced gameplay:</strong> The game can now position the window for optimal interaction</li>
+                <li><strong>Use the popup:</strong> Click the extension icon to manually control window positioning</li>
+            </ol>
+        </div>
+        
+        <div class="warning">
+            <h4>⚠️ Important Notes</h4>
+            <ul>
+                <li>This extension only works on supported sites (localhost:8000, rebroad.github.io)</li>
+                <li>Window positioning requires user permission for security reasons</li>
+                <li>The extension uses deprecated but functional browser APIs</li>
+                <li>Some browsers may block window movement for security</li>
+            </ul>
+        </div>
+        
+        <div class="feature">
+            <h3>🎯 Supported Features</h3>
+            <ul>
+                <li>Window positioning (move to specific coordinates)</li>
+                <li>Relative window movement (move by offset)</li>
+                <li>Permission-based access control</li>
+                <li>Manual control via extension popup</li>
+                <li>Automatic detection of supported sites</li>
+            </ul>
+        </div>
+        
+        <div class="buttons">
+            <a href="https://rebroad.github.io/androidballs/" class="btn" target="_blank">Try the Game</a>
+            <a href="#" class="btn btn-secondary" id="testExtension">Test Extension</a>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('testExtension').addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Open a test page
+            chrome.tabs.create({
+                url: 'http://localhost:8000/3x2-web-debug.html'
+            });
+        });
+    </script>
+</body>
+</html> 

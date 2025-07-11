@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "3x2 Physics Demo - Window Movement Detector",
+  "version": "1.0.0",
+  "description": "Detects window movement events for the 3x2 Physics Demo web game",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://rebroad.github.io/*",
+    "https://localhost:8000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:8000/*",
+        "https://rebroad.github.io/*",
+        "https://localhost:8000/*"
+      ],
+      "js": ["content-script.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["window-detector.js"],
+      "matches": [
+        "http://localhost:8000/*",
+        "https://rebroad.github.io/*",
+        "https://localhost:8000/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "3x2 Window Detector"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+} 
